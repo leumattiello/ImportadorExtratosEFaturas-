@@ -125,6 +125,8 @@ def _posicao(cabecalhos: list[str], nome: str, manual: str | None) -> int | None
     if len(indices) > 1:
         raise ErroCSV(f"Colunas ambiguas para {nome}; especifique o cabecalho exato.")
     if manual and not indices:
+        if nome == "descricao":
+            raise ErroCSV("Coluna de descricao nao encontrada.")
         raise ErroCSV(f"Coluna configurada para {nome} nao encontrada no cabecalho.")
     return indices[0] if indices else None
 
