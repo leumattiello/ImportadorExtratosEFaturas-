@@ -2,41 +2,51 @@
 
 Projeto Python para futura importacao incremental de extratos e faturas na contabilidade privada do Google Sheets.
 
-**Estado:** apenas estrutura segura. Ainda NAO existem leitura de extratos, conexao ao Google Sheets ou escrita financeira.
+**Estado:** inventario e leitura local de transacoes **OFX e CSV**, somente leitura. **Ainda nao existe gravacao no Google Sheets, classificacao, historico de importacoes ou protecao de duplicidades entre movimentacoes.** A leitura de CSV esta em revisao na PR desta etapa.
 
 ## Arquitetura aprovada
 
-- Programa Python executado localmente no notebook Windows.
-- Fonte: pasta local privada com subpastas por competencia, como 2026 e 2027.
-- Os documentos originais permanecerao intactos na pasta.
-- Importacoes futuras identificarao arquivos e movimentos ja processados, inclusive lancamentos manuais.
-- Itens novos serao revisados e aprovados antes de serem acrescentados a planilha, sem sobrescrita.
-- Conciliacao bancaria ficara para uma etapa posterior.
+- Programa Python executado localmente no notebook Windows (tambem testavel no Ubuntu).
+- Fonte: pasta local privada, **fora do clone Git**, com subpastas por competencia, como `2026/` e `2027/`.
+- Os documentos originais permanecem intactos na pasta.
+- Futuras importacoes precisarao identificar arquivos e movimentos ja processados, inclusive lancamentos manuais.
+- So itens novos e aprovados poderao ser acrescentados na planilha; sem sobrescrita.
+- A conciliacao financeira esta prevista para etapa posterior.
 
 ## Repositorio publico: privacidade obrigatoria
 
-Nunca versionar extratos ou faturas reais, planilhas financeiras, nomes e identificadores pessoais, senhas, tokens, credenciais Google, configuracoes locais ou historicos de importacao.
+Nunca versionar extratos/faturas reais, planilhas financeiras, dados pessoais, senhas, tokens, credenciais Google, configuracoes privadas ou historicos de importacao.
 
-O .gitignore e uma protecao complementar e nao impede que dados sejam publicados se forem adicionados a arquivos permitidos, forcados com git add -f ou enviados em commits anteriores.
+O `.gitignore` e protecao complementar, nao garantia. Confira cada diff. Leia [docs/PRIVACIDADE.md](docs/PRIVACIDADE.md).
 
-Leia docs/PRIVACIDADE.md antes de contribuir. Use exclusivamente exemplos totalmente ficticios.
+## Testar no Ubuntu
 
-## Teste no Windows (PowerShell)
+~~~bash
+cd "$HOME/Projetos/ImportadorExtratosEFaturas-"
+PYTHONPATH=src python3 -m unittest discover -s tests -v
+PYTHONPATH=src python3 -m importador_extratos --pasta "$HOME/Financeiro/ExtratosFaturas" --analisar-ofx --analisar-csv
+~~~
 
-Requisitos: Python 3.10+ e Git, sem bibliotecas de terceiros para esta etapa.
+A saida padrao apresenta **somente contagens**, sem revelar nomes, descricoes, identificadores ou valores privados. O programa **nao grava nada**.
+
+## Testar no Windows (PowerShell)
+
+Requisitos: Python 3.10+ e Git; as leituras atuais usam somente bibliotecas padrao do Python.
 
 ~~~powershell
 $env:PYTHONPATH = "src"
-py -3 -m importador_extratos
 py -3 -m unittest discover -s tests -v
+py -3 -m importador_extratos --pasta "C:\Financeiro\ExtratosFaturas" --analisar-ofx --analisar-csv
 Remove-Item Env:PYTHONPATH
 ~~~
 
-A execucao inicial apenas imprime uma mensagem; nao abre arquivos financeiros e nao modifica planilhas.
+O caminho de exemplo no Windows deve ser ajustado para a pasta privada real.
+
+**Documentacao:** [inventario](docs/INVENTARIO.md), [leitura OFX](docs/OFX.md) e [leitura CSV](docs/CSV.md). Se o CSV nao corresponder aos cabecalhos conhecidos, veja as opcoes de mapeamento manual em `docs/CSV.md`. Nao envie documentos financeiros para o repositorio.
 
 ## Revisao antes de publicar
 
-~~~powershell
+~~~bash
 git status --short
 git diff --cached --name-only
 git diff --cached
@@ -44,4 +54,4 @@ git diff --cached
 
 Criar uma branch por mudanca e solicitar revisao por pull request antes do merge.
 
-O repositorio contem LICENSE com o texto da GPLv3; preservar a licenca existente.
+O repositorio contem [LICENSE](LICENSE) com o texto da GPLv3; preservar a licenca existente.
