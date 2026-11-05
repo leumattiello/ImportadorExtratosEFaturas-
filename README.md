@@ -2,7 +2,7 @@
 
 Projeto Python para futura importacao incremental de extratos e faturas na contabilidade privada do Google Sheets.
 
-**Estado:** inventario e leitura local de transacoes **OFX e CSV**, somente leitura. **Ainda nao existe gravacao no Google Sheets, classificacao, historico de importacoes ou protecao de duplicidades entre movimentacoes.** A leitura de CSV esta em revisao na PR desta etapa.
+**Estado:** inventario e leitura local de transacoes **OFX e CSV**, somente leitura. **Ainda nao existe gravacao no Google Sheets, classificacao, historico de importacoes ou protecao de duplicidades entre movimentacoes.** Os perfis de mapeamento por cabecalho estao em revisao na PR desta etapa.
 
 ## Arquitetura aprovada
 
@@ -42,7 +42,7 @@ Remove-Item Env:PYTHONPATH
 
 O caminho de exemplo no Windows deve ser ajustado para a pasta privada real.
 
-**Documentacao:** [inventario](docs/INVENTARIO.md), [leitura OFX](docs/OFX.md) e [leitura CSV](docs/CSV.md). Se o CSV nao corresponder aos cabecalhos conhecidos, veja as opcoes de mapeamento manual em `docs/CSV.md`. Nao envie documentos financeiros para o repositorio.
+**Documentacao:** [inventario](docs/INVENTARIO.md), [leitura OFX](docs/OFX.md) [leitura CSV](docs/CSV.md) e [perfis CSV](docs/PERFIS_CSV.md). Se o CSV nao corresponder aos cabecalhos conhecidos, veja as opcoes de mapeamento manual em `docs/CSV.md`. Nao envie documentos financeiros para o repositorio.
 
 ## Revisao antes de publicar
 
