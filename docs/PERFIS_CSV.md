@@ -21,7 +21,8 @@ Exemplo **100% ficticio**, que deve ser adaptado aos cabecalhos do seu CSV:
 ~~~ini
 [perfil:extrato_exemplo]
 requer_colunas = Data | Lançamento | Histórico | Valor
-descricao = Lançamento
+descricao = Lançamento | Histórico
+separador_descricao = " - "
 valor = Valor
 delimitador = ;
 
@@ -38,6 +39,36 @@ Em `requer_colunas`, separe os cabecalhos por `|`. Indique ao menos duas colunas
 Os campos opcionais de cada perfil sao `data`, `descricao`, `valor`, `credito`, `debito`, `identificador`, `delimitador` e `pular_linhas`. Quando necessario, `pular_linhas` determina quantas linhas introdutorias precedem o cabecalho. Nao combine `valor` com `credito` ou `debito`.
 
 **Nao publique seu `perfis.ini` no GitHub.** Ele pode conter cabecalhos especificos de um banco; o exemplo acima e sintetico.
+
+## Concatenar colunas de descricao
+
+Um perfil pode combinar de **uma a 16 colunas** em uma descricao, respeitando a ordem indicada e utilizando `|` para separar **nomes de colunas**:
+
+~~~ini
+[perfil:extrato_exemplo]
+requer_colunas = Data | Lançamento | Histórico | Valor
+descricao = Lançamento | Histórico
+separador_descricao = " - "
+valor = Valor
+delimitador = ;
+~~~
+
+Exemplo inteiramente ficticio:
+
+| Lançamento | Historico | Descricao interpretada |
+| --- | --- | --- |
+| PIX ENVIADO | Pagamento ficticio | PIX ENVIADO - Pagamento ficticio |
+| TARIFA | (vazio) | TARIFA |
+| (vazio) | Estorno ficticio | Estorno ficticio |
+
+- O separador padrao e ` - `. Para preservar espacos ao redor do separador, coloque-o entre aspas duplas ou simples. As aspas nao fazem parte do resultado. `separador_descricao = " / "` usa barras com espacos; `separador_descricao = ""` junta os textos sem separador.
+- Espacos externos de cada componente sao removidos. Valores vazios sao ignorados, sem separadores adicionais.
+- Se todos os campos de descricao estiverem vazios em alguma movimentacao, a leitura falha de modo controlado.
+- Colunas ausentes, repetidas ou reutilizadas indevidamente em outros campos nao sao aceitas.
+- A configuracao antiga `descricao = Lançamento` continua valida.
+- O mapeamento manual `--csv-coluna-descricao 'Lançamento | Histórico'` tambem aceita multiplas colunas, mantendo o separador padrao.
+
+As descricoes montadas sao mantidas apenas em memoria; por padrao a linha de comando apresenta somente a **quantidade** de movimentacoes. O conteudo completo aparece apenas se `--mostrar-detalhes` for escolhido explicitamente em terminal privado.
 
 ## Executar no Ubuntu
 

@@ -144,5 +144,130 @@ requer_colunas = Lançamento | Lancamento
         repo=Path(__file__).resolve().parents[1]
         with self.assertRaises(ErroPerfis): ler_perfis(repo/"qualquer.ini")
 
+    def test_concatenacao_multiplas_colunas_na_ordem(self):
+        self.configurar("""[perfil:concatenado]
+requer_colunas = Data | Lançamento | Histórico | Complemento | Valor
+descricao = Lançamento | Histórico | Complemento
+separador_descricao = " - "
+valor = Valor
+delimitador = ;
+""")
+        p = self.csv("2026", "a.csv",
+                     "Data;Lançamento;Histórico;Complemento;Valor\n"
+                     "01/11/2026;  PIX  ;  Serviço ; Pagamento ; -15,00\n"
+                     "02/11/2026;  Tarifa ;;  ; -2,00\n"
+                     "03/11/2026;;  Referência ;  ; 3,00\n")
+        perfil = selecionar_perfil(p, ler_perfis(self.ini))
+        mov = ler_csv(p, colunas=perfil.colunas, delimitador=perfil.delimitador)
+        self.assertEqual([m.descricao for m in mov],
+                         ["PIX - Serviço - Pagamento", "Tarifa", "Referência"])
+        self.assertEqual(len(mov), 3)
+        status, saida, erro = self.executar()
+        self.assertEqual(status, 0, erro)
+        self.assertIn("Movimentacoes CSV identificadas: 3", saida)
+        self.assertNotIn("PIX", saida + erro)
+
+    def test_separador_customizado_e_coluna_unica_compativel(self):
+        self.configurar("""[perfil:custom]
+requer_colunas = Data | Lançamento | Histórico | Valor
+descricao = Lançamento | Histórico
+separador_descricao = " / "
+valor = Valor
+delimitador = ;
+""")
+        p = self.csv("2026", "a.csv",
+                     "Data;Lançamento;Histórico;Valor\n01/11/2026;PIX;Chave fictícia;5,00\n")
+        perfil = selecionar_perfil(p, ler_perfis(self.ini))
+        self.assertEqual(ler_csv(p, colunas=perfil.colunas, delimitador=";")[0].descricao,
+                         "PIX / Chave fictícia")
+        self.configurar()
+        perfil = selecionar_perfil(p, ler_perfis(self.ini))
+        self.assertEqual(ler_csv(p, colunas=perfil.colunas, delimitador=";")[0].descricao,
+                         "PIX")
+
+    def test_coluna_de_descricao_inexistente_recusada(self):
+        self.configurar("""[perfil:invalido]
+requer_colunas = Data | Lançamento | Valor
+descricao = Lançamento | Complemento
+valor = Valor
+delimitador = ;
+""")
+        self.csv("2026", "a.csv",
+                 "Data;Lançamento;Valor\n01/11/2026;DADO PRIVADO;5,00\n")
+        status, saida, erro = self.executar()
+        self.assertEqual(status, 1)
+        self.assertIn("Coluna de descricao nao encontrada", erro)
+        self.assertNotIn("DADO PRIVADO", saida + erro)
+
+    def test_descricoes_todas_vazias_recusadas(self):
+        self.configurar("""[perfil:vazio]
+requer_colunas = Data | Lançamento | Histórico | Valor
+descricao = Lançamento | Histórico
+valor = Valor
+delimitador = ;
+""")
+        self.csv("2026", "a.csv",
+                 "Data;Lançamento;Histórico;Valor\n01/11/2026; ; ;5,00\n")
+        status, _, erro = self.executar()
+        self.assertEqual(status, 1)
+        self.assertIn("Descricao CSV ausente", erro)
+
+    def test_rejeita_colunas_repetidas_com_ou_sem_acentos(self):
+        for duplicado in ("Lançamento | Lancamento", "Lançamento | Lançamento", "Lançamento | "):
+            with self.subTest(duplicado=duplicado):
+                self.configurar("""[perfil:duplo]
+requer_colunas = Data | Lançamento | Valor
+descricao = """ + duplicado + """
+""")
+                with self.assertRaises(ErroPerfis):
+                    ler_perfis(self.ini)
+
+    def test_separador_vazio_e_customizado(self):
+        self.configurar("""[perfil:sem_separador]
+requer_colunas = Data | Lançamento | Histórico | Valor
+descricao = Lançamento | Histórico
+separador_descricao = ""
+valor = Valor
+delimitador = ;
+""")
+        p = self.csv("2026", "a.csv",
+                     "Data;Lançamento;Histórico;Valor\n01/11/2026;PIX; fictício ;5,00\n")
+        perfil = selecionar_perfil(p, ler_perfis(self.ini))
+        self.assertEqual(ler_csv(p, colunas=perfil.colunas, delimitador=";")[0].descricao,
+                         "PIXfictício")
+        self.configurar("""[perfil:separador_invalido]
+requer_colunas = Data | Lançamento | Valor
+descricao = Lançamento
+separador_descricao = """ + "x" * 41 + """
+""")
+        with self.assertRaises(ErroPerfis):
+            ler_perfis(self.ini)
+
+    def test_coluna_ja_utilizada_como_valor_rejeitada(self):
+        self.configurar("""[perfil:colisao]
+requer_colunas = Data | Lançamento | Valor
+descricao = Lançamento | Valor
+valor = Valor
+delimitador = ;
+""")
+        self.csv("2026", "a.csv",
+                 "Data;Lançamento;Valor\n01/11/2026;Teste;5,00\n")
+        status, _, erro = self.executar()
+        self.assertEqual(status, 1)
+        self.assertIn("mesma coluna", erro)
+
+    def test_linha_com_quebra_interna_preservada(self):
+        self.configurar("""[perfil:quebra]
+requer_colunas = Data | Lançamento | Histórico | Valor
+descricao = Lançamento | Histórico
+valor = Valor
+delimitador = ;
+""")
+        p = self.csv("2026", "a.csv",
+                     'Data;Lançamento;Histórico;Valor\n01/11/2026;"  Compra\nem loja ";OK;3,00\n')
+        perfil = selecionar_perfil(p, ler_perfis(self.ini))
+        mov = ler_csv(p, colunas=perfil.colunas, delimitador=";")
+        self.assertEqual(mov[0].descricao, "Compra\nem loja - OK")
+
 
 if __name__ == "__main__": unittest.main()

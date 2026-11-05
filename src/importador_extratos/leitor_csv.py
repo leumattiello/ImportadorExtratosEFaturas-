@@ -37,6 +37,7 @@ class ColunasCSV:
     credito: str | None = None
     debito: str | None = None
     identificador: str | None = None
+    separador_descricao: str = " - "
 
 
 _ALIASES = {
@@ -128,13 +129,33 @@ def _posicao(cabecalhos: list[str], nome: str, manual: str | None) -> int | None
     return indices[0] if indices else None
 
 
-def _escolher_colunas(cabecalhos: list[str], config: ColunasCSV) -> dict[str, int | None]:
+def _indices_descricao(cabecalhos: list[str], configurada: str | None) -> tuple[int, ...] | None:
+    """Resolve uma ou varias colunas em ordem, sem aceitar ambiguidades."""
+    if configurada is None:
+        unica = _posicao(cabecalhos, "descricao", None)
+        return (unica,) if unica is not None else None
+    nomes = [nome.strip() for nome in configurada.split("|")]
+    normalizados = [_normalizar(nome) for nome in nomes]
+    if (not 1 <= len(nomes) <= 16 or any(not nome for nome in normalizados)
+            or len(set(normalizados)) != len(nomes)):
+        raise ErroCSV("Configuracao de colunas de descricao invalida.")
+    indices = []
+    for nome in nomes:
+        indice = _posicao(cabecalhos, "descricao", nome)
+        if indice is None:
+            raise ErroCSV("Coluna de descricao nao encontrada.")
+        indices.append(indice)
+    return tuple(indices)
+
+
+def _escolher_colunas(cabecalhos: list[str], config: ColunasCSV) -> dict[str, int | tuple[int, ...] | None]:
     if not cabecalhos or any(not c.strip() for c in cabecalhos):
         raise ErroCSV("Cabecalho CSV invalido.")
     colunas = {
         nome: _posicao(cabecalhos, nome, getattr(config, nome))
-        for nome in _ALIASES
+        for nome in _ALIASES if nome != "descricao"
     }
+    colunas["descricao"] = _indices_descricao(cabecalhos, config.descricao)
     if colunas["data"] is None or colunas["descricao"] is None:
         raise ErroCSV("Nao foi possivel identificar as colunas de data e descricao.")
     if config.valor and (config.credito or config.debito):
@@ -149,7 +170,12 @@ def _escolher_colunas(cabecalhos: list[str], config: ColunasCSV) -> dict[str, in
         raise ErroCSV("Valor e credito/debito coexistem; escolha colunas explicitamente.")
     if colunas["valor"] is None and colunas["credito"] is None and colunas["debito"] is None:
         raise ErroCSV("Nao foi possivel identificar as colunas monetarias.")
-    indices = [i for i in colunas.values() if i is not None]
+    indices = [
+        indice
+        for entrada in colunas.values()
+        for indice in (entrada if isinstance(entrada, tuple)
+                       else ((entrada,) if entrada is not None else ()))
+    ]
     if len(indices) != len(set(indices)):
         raise ErroCSV("A mesma coluna foi atribuida a diferentes campos.")
     return colunas
@@ -215,6 +241,11 @@ def ler_csv(
     if pular_linhas < 0:
         raise ErroCSV("Numero de linhas ignoradas invalido.")
     config = colunas or ColunasCSV()
+    separador_descricao = config.separador_descricao
+    if (not isinstance(separador_descricao, str) or len(separador_descricao) > 40
+            or any(ord(caractere) < 32 or ord(caractere) == 127
+                   for caractere in separador_descricao)):
+        raise ErroCSV("Separador de descricao invalido.")
     conteudo = _ler_texto(caminho)
     separador = _separador(conteudo, delimitador, pular_linhas)
     dados = "".join(conteudo.splitlines(keepends=True)[pular_linhas:])
@@ -230,9 +261,14 @@ def ler_csv(
             if len(linha) != len(cabecalho):
                 raise ErroCSV(f"Quantidade de campos invalida na linha {numero}.")
             try:
-                descricao = linha[indices["descricao"]].strip()
-                if not descricao:
+                partes = [
+                    linha[indice].strip()
+                    for indice in indices["descricao"]
+                    if linha[indice].strip()
+                ]
+                if not partes:
                     raise ErroCSV("Descricao CSV ausente.")
+                descricao = separador_descricao.join(partes)
                 ident = indices["identificador"]
                 movimentos.append(MovimentoCSV(
                     data=_data(linha[indices["data"]]), descricao=descricao,

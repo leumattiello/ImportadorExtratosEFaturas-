@@ -12,7 +12,7 @@ from .leitor_csv import ColunasCSV, ErroCSV, _ler_texto, _separador, _normalizar
 _LIMITE_CONFIG = 128 * 1024
 _LIMITE_PERFIS = 50
 _CAMPOS = ("data", "descricao", "valor", "credito", "debito", "identificador")
-_OPCOES = {"requer_colunas", "delimitador", "pular_linhas", *_CAMPOS}
+_OPCOES = {"requer_colunas", "delimitador", "pular_linhas", "separador_descricao", *_CAMPOS}
 
 
 class ErroPerfis(Exception):
@@ -75,8 +75,23 @@ def ler_perfis(arquivo: Path) -> tuple[PerfilCSV, ...]:
             raise ErroPerfis("Nome de coluna configurada invalido.")
         if mapeamento["valor"] and (mapeamento["credito"] or mapeamento["debito"]):
             raise ErroPerfis("Perfil nao pode misturar valor e credito/debito configurados.")
+        if mapeamento["descricao"] is not None:
+            descricoes = [_normalizar(nome) for nome in mapeamento["descricao"].split("|")]
+            if (not 1 <= len(descricoes) <= 16 or any(not nome for nome in descricoes)
+                    or len(set(descricoes)) != len(descricoes)):
+                raise ErroPerfis("Lista de colunas de descricao invalida.")
+        separador = opcoes.get("separador_descricao")
+        if separador is None:
+            separador = " - "
+        elif len(separador) >= 2 and separador[0] == separador[-1] and separador[0] in ("'", '"'):
+            separador = separador[1:-1]
+        elif "'" in separador or '"' in separador:
+            raise ErroPerfis("Separador de descricao invalido.")
+        if len(separador) > 40 or any(ord(c) < 32 or ord(c) == 127 for c in separador):
+            raise ErroPerfis("Separador de descricao invalido.")
         saida.append(PerfilCSV(
-            identificacao=frozenset(exigidas), colunas=ColunasCSV(**mapeamento),
+            identificacao=frozenset(exigidas),
+            colunas=ColunasCSV(**mapeamento, separador_descricao=separador),
             delimitador=delim, pular_linhas=ignoradas,
         ))
     return tuple(saida)
