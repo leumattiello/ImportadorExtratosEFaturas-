@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 import sys
 
+from .historico import ErroHistorico, registrar_tentativa
 from .inventario import ErroInventario, inventariar
 from .leitor_csv import ColunasCSV, ErroCSV, ler_csv
 from .ofx import ErroOFX, ler_ofx
@@ -15,6 +16,8 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
     parser.add_argument("--pasta", type=Path, help="Raiz privada com subpastas AAAA.")
     parser.add_argument("--analisar-ofx", action="store_true", help="Interpretar transacoes OFX.")
     parser.add_argument("--analisar-csv", action="store_true", help="Interpretar transacoes CSV.")
+    parser.add_argument("--registrar-historico", action="store_true",
+                        help="Registrar tentativas de leitura em CSV local privado.")
     parser.add_argument("--mostrar-detalhes", action="store_true",
                         help="Mostrar dados financeiros privados no terminal local.")
     parser.add_argument("--csv-delimitador", choices=(";", ",", "tab"),
@@ -29,6 +32,8 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
         parser.add_argument(f"--csv-coluna-{opcao}",
                             help=f"Nome literal do cabecalho CSV para {opcao}.")
     args = parser.parse_args(argv)
+    if args.registrar_historico and not (args.analisar_ofx or args.analisar_csv):
+        parser.error("--registrar-historico requer --analisar-ofx ou --analisar-csv")
     if args.mostrar_detalhes and not (args.analisar_ofx or args.analisar_csv):
         parser.error("--mostrar-detalhes requer --analisar-ofx ou --analisar-csv")
     if (args.analisar_ofx or args.analisar_csv) and args.pasta is None:
@@ -53,15 +58,34 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
     print(f"Arquivos candidatos: {len(dados.arquivos)}")
     print(f"Possiveis repeticoes (hash identico): {dados.possiveis_repetidos}")
     print(f"Itens ignorados: {dados.ignorados}")
+
+    registros = 0
+
+    def registrar(arquivo, resultado: str, quantidade: int) -> bool:
+        nonlocal registros
+        if not args.registrar_historico:
+            return True
+        try:
+            registrar_tentativa(args.pasta, arquivo, resultado, quantidade)
+        except ErroHistorico as exc:
+            print(f"Falha no historico local: {exc}", file=sys.stderr)
+            return False
+        registros += 1
+        return True
     if args.analisar_ofx:
         arquivos = [a for a in dados.arquivos if a.formato == ".ofx"]
         movimentos = []
         for arquivo in arquivos:
             try:
-                movimentos.extend(ler_ofx(arquivo.caminho))
+                lidos = ler_ofx(arquivo.caminho)
             except ErroOFX as exc:
+                if not registrar(arquivo, "ERRO", 0):
+                    return 1
                 print(f"Falha ao interpretar um OFX: {exc}", file=sys.stderr)
                 return 1
+            if not registrar(arquivo, "ANALISADO", len(lidos)):
+                return 1
+            movimentos.extend(lidos)
         print(f"Arquivos OFX analisados: {len(arquivos)}")
         print(f"Movimentacoes OFX identificadas: {len(movimentos)}")
         if args.mostrar_detalhes:
@@ -104,10 +128,15 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
                     perfil = selecionar_perfil(arquivo.caminho, perfis)
                     opcoes = dict(colunas=perfil.colunas, delimitador=perfil.delimitador,
                                   pular_linhas=perfil.pular_linhas)
-                movimentos.extend(ler_csv(arquivo.caminho, **opcoes))
+                lidos = ler_csv(arquivo.caminho, **opcoes)
             except (ErroCSV, ErroPerfis) as exc:
+                if not registrar(arquivo, "ERRO", 0):
+                    return 1
                 print(f"Falha ao interpretar um CSV: {exc}", file=sys.stderr)
                 return 1
+            if not registrar(arquivo, "ANALISADO", len(lidos)):
+                return 1
+            movimentos.extend(lidos)
         print(f"Arquivos CSV analisados: {len(arquivos)}")
         print(f"Movimentacoes CSV identificadas: {len(movimentos)}")
         if perfis is not None:
@@ -117,7 +146,11 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
             for mov in movimentos:
                 print(f"{mov.data.isoformat()} | {mov.valor} | {mov.descricao!r} | "
                       f"ID: {mov.identificador!r}")
-    print("Nenhum lancamento foi importado e nenhum arquivo foi alterado.")
+    if args.registrar_historico:
+        print(f"Registros acrescentados ao historico local: {registros}")
+        print("Nenhum lancamento foi importado e nenhum extrato original foi alterado.")
+    else:
+        print("Nenhum lancamento foi importado e nenhum arquivo foi alterado.")
     return 0
 
 

@@ -2,7 +2,7 @@
 
 Projeto Python para futura importacao incremental de extratos e faturas na contabilidade privada do Google Sheets.
 
-**Estado:** inventario e leitura local de transacoes **OFX e CSV**, somente leitura. **Ainda nao existe gravacao no Google Sheets, classificacao, historico de importacoes ou protecao de duplicidades entre movimentacoes.** Os perfis de mapeamento por cabecalho estao em revisao na PR desta etapa.
+**Estado:** inventario e leitura local de transacoes **OFX e CSV**, somente leitura. **Ainda nao existe gravacao no Google Sheets, classificacao ou protecao de duplicidades entre movimentacoes. O historico CSV de analises pode ser ativado explicitamente.** Os perfis de CSV por cabecalho estao implementados.
 
 ## Arquitetura aprovada
 
@@ -25,9 +25,10 @@ O `.gitignore` e protecao complementar, nao garantia. Confira cada diff. Leia [d
 cd "$HOME/Projetos/ImportadorExtratosEFaturas-"
 PYTHONPATH=src python3 -m unittest discover -s tests -v
 PYTHONPATH=src python3 -m importador_extratos --pasta "$HOME/Financeiro/ExtratosFaturas" --analisar-ofx --analisar-csv
+# Historico privado opcional: acrescente --registrar-historico ao comando anterior.
 ~~~
 
-A saida padrao apresenta **somente contagens**, sem revelar nomes, descricoes, identificadores ou valores privados. O programa **nao grava nada**.
+A saida padrao apresenta **somente contagens**, sem revelar nomes, descricoes, identificadores ou valores privados. O programa **nao grava nada**, exceto quando a opcao explicita `--registrar-historico` for utilizada; nesse caso grava somente o historico de analises.
 
 ## Testar no Windows (PowerShell)
 
@@ -42,7 +43,7 @@ Remove-Item Env:PYTHONPATH
 
 O caminho de exemplo no Windows deve ser ajustado para a pasta privada real.
 
-**Documentacao:** [inventario](docs/INVENTARIO.md), [leitura OFX](docs/OFX.md) [leitura CSV](docs/CSV.md) e [perfis CSV](docs/PERFIS_CSV.md). Se o CSV nao corresponder aos cabecalhos conhecidos, veja as opcoes de mapeamento manual em `docs/CSV.md`. Nao envie documentos financeiros para o repositorio.
+**Documentacao:** [inventario](docs/INVENTARIO.md), [leitura OFX](docs/OFX.md) [leitura CSV](docs/CSV.md) e [perfis CSV](docs/PERFIS_CSV.md), mais o [historico local](docs/HISTORICO.md). Se o CSV nao corresponder aos cabecalhos conhecidos, veja as opcoes de mapeamento manual em `docs/CSV.md`. Nao envie documentos financeiros para o repositorio.
 
 ## Revisao antes de publicar
 
