@@ -69,3 +69,6 @@ Desktop.ini
 
 # Perfis CSV privados (nunca versionar configuracao real).
 perfis.ini
+
+# Historico privado de tentativas de leitura.
+historico_importacoes.csv
