@@ -46,6 +46,20 @@ O arquivo de historico **contem nomes reais de arquivos e hashes**, portanto e p
 
 Esta implementacao e destinada a uma unica instancia local do importador. Nao e um mecanismo de bloqueio de concorrencia nem uma transacao atomica com o Google Sheets. Para homologacao, execute em apenas um terminal de cada vez. Os testes usam exclusivamente exemplos ficticios.
 
+## Consultar arquivos conhecidos (PR #7)
+
+A partir desta etapa, o programa le `historico_importacoes.csv` automaticamente em **modo somente leitura**, inclusive quando `--registrar-historico` nao e informado. Ele informa apenas tres contagens referentes a arquivos CSV/OFX presentes no inventario atual:
+
+- `Arquivos CSV/OFX nunca analisados`: hashes ausentes do historico;
+- `Arquivos CSV/OFX ja analisados`: hashes com ao menos uma ocorrencia `ANALISADO`;
+- `Arquivos CSV/OFX com erro anterior`: hashes com apenas registros `ERRO`.
+
+Se um arquivo foi renomeado mas manteve o mesmo conteudo, seu hash continua reconhecido. Se o conteudo mudar, passa a ser tratado como diferente. Se aparecerem dois arquivos com o mesmo hash, contam-se dois arquivos, nao um so. Quando existem registros de sucesso e de erro para o mesmo hash, o sucesso prevalece para indicar que **ja houve** uma analise bem-sucedida, sem afirmar que a ultima tentativa tenha sido bem-sucedida.
+
+A consulta acontece antes dos novos registros da execucao, portanto o programa nao classifica um arquivo como anteriormente analisado so porque acabou de le-lo. Nenhum arquivo e ignorado por essa classificacao, nenhuma movimentacao e deduplicada, e nenhum lancamento e gravado na planilha.
+
+Sem arquivo de historico, as contagens reconhecem todos os CSV/OFX como nunca analisados; a consulta nao cria arquivo. Se o historico existente estiver malformado, com permissoes inseguras, tiver sido substituido por link simbolico ou ultrapassar o limite de leitura de 20 MiB, a consulta falha de forma controlada. Nunca publique o historico real.
+
 ## Proximas etapas
 
 - Criar identificacao de movimentos e deteccao de sobreposicoes entre extratos;

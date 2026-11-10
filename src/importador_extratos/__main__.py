@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 from .historico import ErroHistorico, registrar_tentativa
+from .consulta_historico import consultar_historico
 from .inventario import ErroInventario, inventariar
 from .leitor_csv import ColunasCSV, ErroCSV, ler_csv
 from .ofx import ErroOFX, ler_ofx
@@ -58,6 +59,14 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
     print(f"Arquivos candidatos: {len(dados.arquivos)}")
     print(f"Possiveis repeticoes (hash identico): {dados.possiveis_repetidos}")
     print(f"Itens ignorados: {dados.ignorados}")
+    try:
+        resumo = consultar_historico(args.pasta, dados.arquivos)
+    except ErroHistorico as exc:
+        print(f"Falha ao consultar o historico local: {exc}", file=sys.stderr)
+        return 1
+    print(f"Arquivos CSV/OFX nunca analisados: {resumo.nunca_analisados}")
+    print(f"Arquivos CSV/OFX ja analisados: {resumo.ja_analisados}")
+    print(f"Arquivos CSV/OFX com erro anterior: {resumo.com_erro_anterior}")
 
     registros = 0
 
