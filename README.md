@@ -2,7 +2,7 @@
 
 Projeto Python para futura importacao incremental de extratos e faturas na contabilidade privada do Google Sheets.
 
-**Estado:** inventario e leitura local de transacoes **OFX e CSV**, somente leitura. **Ainda nao existe gravacao no Google Sheets, classificacao ou protecao de duplicidades entre movimentacoes. O historico CSV de analises pode ser ativado explicitamente.** Os perfis de CSV por cabecalho estao implementados.
+**Estado:** inventario e leitura local de transacoes **OFX e CSV**, somente leitura. **Ainda nao existe gravacao no Google Sheets, classificacao ou protecao de duplicidades entre movimentacoes. O historico CSV de analises pode ser ativado explicitamente, e arquivos previamente analisados sao reconhecidos pelo hash.** Os perfis de CSV por cabecalho estao implementados.
 
 ## Arquitetura aprovada
 
@@ -28,7 +28,7 @@ PYTHONPATH=src python3 -m importador_extratos --pasta "$HOME/Financeiro/Extratos
 # Historico privado opcional: acrescente --registrar-historico ao comando anterior.
 ~~~
 
-A saida padrao apresenta **somente contagens**, sem revelar nomes, descricoes, identificadores ou valores privados. O programa **nao grava nada**, exceto quando a opcao explicita `--registrar-historico` for utilizada; nesse caso grava somente o historico de analises.
+A saida padrao apresenta **somente contagens**, inclusive arquivos nunca analisados, ja analisados ou com erro anterior, sem revelar nomes, descricoes, identificadores ou valores privados. O programa **nao grava nada**, exceto quando a opcao explicita `--registrar-historico` for utilizada; nesse caso grava somente o historico de analises.
 
 ## Testar no Windows (PowerShell)
 
