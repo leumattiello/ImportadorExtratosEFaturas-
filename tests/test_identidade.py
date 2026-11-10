@@ -130,10 +130,18 @@ class IdentidadeTests(unittest.TestCase):
 
     def test_mesmo_id_contas_distintas_sem_colisao(self):
         antigo = lanc(id="AUTO:BB:CC2:100")
-        self.assertEqual(
-            self.analisar([lanc(id="100")], [antigo])[0].situacao,
-            "NOVO",
-        )
+        resultado = self.analisar([lanc(id="100")], [antigo])[0]
+        self.assertEqual(resultado.id_proposto, "AUTO:BB:CC1:100")
+        # IDs distintos nao colidem, mas data/valor coincidentes exigem revisao.
+        self.assertEqual(resultado.situacao, "REVISAR")
+        self.assertEqual(resultado.motivo, "possivel_sobreposicao")
+
+    def test_contas_distintas_sem_sobreposicao_retorna_novo(self):
+        antigo = lanc(valor="-99.99", id="AUTO:BB:CC2:100")
+        resultado = self.analisar([lanc(id="100")], [antigo])[0]
+        self.assertEqual(resultado.id_proposto, "AUTO:BB:CC1:100")
+        self.assertEqual(resultado.situacao, "NOVO")
+        self.assertEqual(resultado.motivo, "id_nao_encontrado")
 
     def test_nao_aceita_valor_invalido(self):
         com_nan = lanc(valor="NaN", id="100")
