@@ -24,8 +24,9 @@ PYTHONPATH=src python3 -m importador_extratos \
 Um arquivo OFX/CSV por execucao; o mes e ano de competencia sao explicitos. A data real do documento permanece intacta.
 Consulta automaticamente os IDs das doze abas mensais, bem como as contas e categorias na aba Dados.
 IDs MAN: e registros antigos sem ID jamais sao alterados ou reclassificados automaticamente.
-Ja existente: ignora; conflito de ID, ID ausente ou repetido no lote: bloqueia; coincidencia de data e valor: pergunta [S/n].
-Enter responde S nas revisoes. --assumir-sim (ou -y) responde S apenas nas revisoes admissiveis e nunca libera conflitos.
+ID bancario confiavel: ja existente e ignorado; conflito de identidade e bloqueado. Para CSV com ID ausente, repetido ou nao confiavel, gera-se um identificador AUTO:...:DERIVADO:<sha256>:<ocorrencia>, calculado por origem/conta, data real, sinal e valor, descricao normalizada e ID externo quando presente. Nao depende de nome, hash do arquivo ou ordem dos extratos.
+O hash nao comprova unicidade: movimentacoes indistinguiveis em um mesmo arquivo e aquelas que ja possuem o mesmo fingerprint na planilha exigem resposta explicita [s/N], com Enter=N. Ao confirmar uma operacao realmente distinta, reserva-se um novo numero de ocorrencia sem sobrescrever o antigo. O argumento -y bloqueia essas duplicidades suspeitas e tambem candidatos com coincidencia de data/valor com qualquer lancamento historico, mesmo sem ID.
+Para candidatos derivados unicos, sem sobreposicao suspeita, pede [S/n] (Enter=S). --assumir-sim (ou -y) confirma apenas esses candidatos admissiveis e nunca libera conflitos.
 CSV utiliza perfis privados por cabecalho; numeros de documento CSV sao tratados como nao confiaveis, salvo --id-confiavel explicito.
 
 ## Gravar apenas depois de homologar a simulacao
@@ -48,3 +49,9 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ```
 
 Os testes sao sinteticos. Nao publique tokens, planilhas, extratos nem logs com dados financeiros no repositorio publico.
+
+## Reimportacao e extratos sobrepostos
+
+Um CSV sem numero de documento ou com numero repetido nao fica sem ID: o identificador derivado e gravado na mesma coluna F da transacao. Em uma reexecucao, quando houver o mesmo fingerprint, o programa **nao** importa de novo por padrao. Para lancar deliberadamente uma segunda compra indistinguivel, e necessario responder explicitamente S a pergunta [s/N]; um sufixo de ocorrencia novo preserva as duas compras. O parametro -y nunca confirma essas ocorrencias adicionais.
+
+A opcao --id-confiavel so deve ser usada com comprovacao da unicidade dos IDs do banco e dentro da conta correta. Nenhum arquivo extra de estado e criado. Para faturas e lotes com categorias diversas, revisar a classificacao financeira uma a uma.
