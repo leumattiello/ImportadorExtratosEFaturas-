@@ -45,6 +45,8 @@ O caminho de exemplo no Windows deve ser ajustado para a pasta privada real.
 
 **Identificadores:** a planilha de homologacao possui uma coluna F (ID) por aba mensal. A geracao e comparacao de IDs estao disponiveis como funcoes de leitura em `identidade.py`; ainda nao ha consulta autenticada nem importacao na planilha. Veja [docs/IDENTIFICADORES.md](docs/IDENTIFICADORES.md).
 
+**PR #9 (importacao controlada):** veja [docs/IMPORTACAO_INTERATIVA.md](docs/IMPORTACAO_INTERATIVA.md) para autenticacao OAuth privada, simulacao por arquivo, `[S/n]`, `--assumir-sim` e gravacao com confirmacao. O modo antigo de analise nao grava lancamentos.
+
 **Documentacao:** [inventario](docs/INVENTARIO.md), [leitura OFX](docs/OFX.md) [leitura CSV](docs/CSV.md) e [perfis CSV](docs/PERFIS_CSV.md), mais o [historico local](docs/HISTORICO.md). Se o CSV nao corresponder aos cabecalhos conhecidos, veja as opcoes de mapeamento manual em `docs/CSV.md`. Nao envie documentos financeiros para o repositorio.
 
 ## Revisao antes de publicar
