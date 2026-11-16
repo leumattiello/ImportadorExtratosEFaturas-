@@ -25,6 +25,7 @@ class Previa:
     ignorados: int
     bloqueados: int
     ids_aprovados: tuple[str,...] = ()
+    motivos_bloqueio: tuple[tuple[str,int], ...] = ()
 
 def confirmar(pergunta, *, assumir_sim=False, entrada=input, padrao_sim=True):
     """Enter responde S em revisoes; no aceite final, Enter responde N."""
@@ -61,6 +62,7 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
     contagens={"NOVO":0,"JA_EXISTENTE":0,"CONFLITO":0,"REVISAR":0}
     aceitos=set();aprovados=[];ids_aprovados=[]
     ignorados=bloqueados=0
+    causas=Counter()
     for indice,(mov,r,identidade) in enumerate(zip(movimentos,avaliados,identidades)):
         ident=identidade.identificador
         reserva=ids_existentes | aceitos
@@ -76,6 +78,7 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
                 contagens["REVISAR"]+=1
                 if assumir_sim:
                     bloqueados+=1
+                    causas["fingerprint_ja_existente" if ja_importado else "fingerprint_ja_aprovado_no_lote"]+=1
                     continue
                 if exige_tty and not sys.stdin.isatty():
                     raise ErroFluxo("Revisao requer terminal ou --assumir-sim.")
@@ -93,6 +96,7 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
                 contagens["REVISAR"]+=1
                 if assumir_sim:
                     bloqueados+=1
+                    causas["movimentos_indistinguiveis_no_arquivo"]+=1
                     continue
                 if exige_tty and not sys.stdin.isatty():
                     raise ErroFluxo("Revisao requer terminal ou --assumir-sim.")
@@ -108,6 +112,7 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
                 contagens["REVISAR"]+=1
                 if possivel_historico and assumir_sim:
                     bloqueados+=1
+                    causas["coincidencia_data_valor_historico"]+=1
                     continue
                 if exige_tty and not assumir_sim and not sys.stdin.isatty():
                     raise ErroFluxo("Revisao requer terminal ou --assumir-sim.")
@@ -118,6 +123,7 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
                     continue
                 if ident in reserva:
                     bloqueados+=1
+                    causas["id_derivado_ja_reservado"]+=1
                     continue
         else:
             contagens[r.situacao]+=1
@@ -127,10 +133,15 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
             if (r.situacao=="CONFLITO" or ident is None
                     or ident in reserva or r.motivo=="id_repetido_no_lote"):
                 bloqueados+=1
+                causas[("conflito_id" if r.situacao=="CONFLITO"
+                        else "id_externo_ausente" if ident is None
+                        else "id_repetido_no_lote" if r.motivo=="id_repetido_no_lote"
+                        else "id_ja_reservado")]+=1
                 continue
             if r.situacao=="REVISAR":
                 if r.motivo=="possivel_sobreposicao" and assumir_sim:
                     bloqueados+=1
+                    causas["coincidencia_data_valor_historico"]+=1
                     continue
                 if exige_tty and not assumir_sim and not sys.stdin.isatty():
                     raise ErroFluxo("Revisao requer terminal ou --assumir-sim.")
@@ -141,13 +152,14 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
                     continue
         if not ident or ident in reserva:
             bloqueados+=1
+            causas["id_final_ausente_ou_reservado"]+=1
             continue
         aprovados.append(indice)
         ids_aprovados.append(ident)
         aceitos.add(ident)
     return Previa(contagens["NOVO"],contagens["JA_EXISTENTE"],contagens["CONFLITO"],
                   contagens["REVISAR"],tuple(aprovados),ignorados,bloqueados,
-                  tuple(ids_aprovados))
+                  tuple(ids_aprovados),tuple(sorted(causas.items())))
 
 def _fonte(pasta,arquivo,ano):
     pasta=Path(pasta).expanduser()
@@ -224,6 +236,10 @@ def executar(args):
         print(f"Para revisao: {previa.revisao}")
         print(f"Aprovadas: {len(previa.aprovados)}")
         print(f"Ignoradas: {previa.ignorados}; bloqueadas: {previa.bloqueados}")
+        if previa.bloqueados:
+            print("Motivos de bloqueio (apenas contagens, sem dados financeiros):")
+            for motivo, quantidade in previa.motivos_bloqueio:
+                print(f"  {motivo}: {quantidade}")
         if not args.importar:
             print("SIMULACAO: nenhum lancamento foi gravado.")
             return 0

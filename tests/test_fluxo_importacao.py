@@ -244,3 +244,51 @@ class TestesIDsDerivados(TestCase):
         self.assertEqual(len(todos),35)
         self.assertEqual((len(r.aprovados),r.bloqueados),(35,0))
         self.assertEqual(len(set(r.ids_aprovados)),35)
+
+
+class TestesDiagnosticoBloqueios(TestCase):
+    def test_coincidencia_com_historico_contada_sem_dados(self):
+        mov = movimento(id=None)
+        antigo = Lancamento(mov.data, "Historico diferente", abs(mov.valor), None)
+        resultado = preparar_previa([mov], [antigo], "BB", "CC1", False,
+                                    assumir_sim=True, exige_tty=False)
+        self.assertEqual(resultado.bloqueados, 1)
+        self.assertEqual(dict(resultado.motivos_bloqueio),
+                         {"coincidencia_data_valor_historico": 1})
+
+    def test_repeticao_interna_de_fingerprint_contada(self):
+        itens = [movimento(id=None), movimento(id=None)]
+        resultado = preparar_previa(itens, (), "BB", "CC1", False,
+                                    assumir_sim=True, exige_tty=False)
+        self.assertEqual(dict(resultado.motivos_bloqueio),
+                         {"movimentos_indistinguiveis_no_arquivo": 2})
+
+    def test_fingerprint_presente_na_planilha_contado(self):
+        mov = movimento(id=None)
+        primeira = preparar_previa([mov], (), "BB", "CC1", False,
+                                   assumir_sim=True, exige_tty=False)
+        antigo = Lancamento(mov.data, mov.descricao, abs(mov.valor),
+                            primeira.ids_aprovados[0])
+        segunda = preparar_previa([mov], [antigo], "BB", "CC1", False,
+                                  assumir_sim=True, exige_tty=False)
+        self.assertEqual(dict(segunda.motivos_bloqueio),
+                         {"fingerprint_ja_existente": 1})
+
+    def test_conflito_id_contado_sem_divulgar_id(self):
+        mov = movimento(id="XYZ")
+        antigo = Lancamento(mov.data, "Outro lancamento", abs(mov.valor),
+                            "AUTO:BB:CC1:XYZ")
+        resultado = preparar_previa([mov], [antigo], "BB", "CC1", True,
+                                    assumir_sim=True, exige_tty=False)
+        self.assertEqual(dict(resultado.motivos_bloqueio), {"conflito_id": 1})
+
+    def test_soma_dos_motivos_igual_a_total_bloqueado(self):
+        mov = movimento(id=None)
+        antigo = Lancamento(mov.data, "Historico", abs(mov.valor), "MAN:1")
+        resultado = preparar_previa([mov, movimento(id=None), movimento(id="D")],
+                                    [antigo], "BB", "CC1", False,
+                                    assumir_sim=True, exige_tty=False)
+        self.assertEqual(sum(v for _, v in resultado.motivos_bloqueio),
+                         resultado.bloqueados)
+        self.assertTrue(all(isinstance(nome, str) and isinstance(qtd, int)
+                            for nome, qtd in resultado.motivos_bloqueio))

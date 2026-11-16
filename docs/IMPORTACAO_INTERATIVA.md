@@ -55,3 +55,15 @@ Os testes sao sinteticos. Nao publique tokens, planilhas, extratos nem logs com 
 Um CSV sem numero de documento ou com numero repetido nao fica sem ID: o identificador derivado e gravado na mesma coluna F da transacao. Em uma reexecucao, quando houver o mesmo fingerprint, o programa **nao** importa de novo por padrao. Para lancar deliberadamente uma segunda compra indistinguivel, e necessario responder explicitamente S a pergunta [s/N]; um sufixo de ocorrencia novo preserva as duas compras. O parametro -y nunca confirma essas ocorrencias adicionais.
 
 A opcao --id-confiavel so deve ser usada com comprovacao da unicidade dos IDs do banco e dentro da conta correta. Nenhum arquivo extra de estado e criado. Para faturas e lotes com categorias diversas, revisar a classificacao financeira uma a uma.
+
+## Diagnostico de bloqueios sem expor dados financeiros
+
+A previa exibe agora o detalhamento **somente por categoria e quantidade** quando ha bloqueios. Esses motivos nao contem datas, valores, descricoes, IDs bancarios nem nomes de arquivos:
+
+- `movimentos_indistinguiveis_no_arquivo`: mais de uma linha gera o mesmo fingerprint dentro do CSV/OFX; com `-y`, exige revisao individual
+- `coincidencia_data_valor_historico`: a data e o valor ja aparecem em algum lancamento das 12 abas, mesmo sem ID; isso **nao prova** que seja o mesmo lancamento
+- `fingerprint_ja_existente`: ID derivado semelhante ja consta na planilha; pode ser reimportacao, nao adicionar automaticamente
+- `fingerprint_ja_aprovado_no_lote`: candidato indistinguivel ja aprovado no lote atual
+- `conflito_id`, `id_repetido_no_lote`, `id_ja_reservado` e outros: identidade externa conflitante ou reserva repetida; nao sobrescrever
+
+Se a previa ainda mostrar bloqueios, **nao** execute `--importar` e nao utilize `--id-confiavel` apenas para forcar aprovacoes. Confirme primeiro se o codigo atualizado esta no HEAD local e depois interprete a lista de motivos. Os registros financeiros reais devem continuar privados.
