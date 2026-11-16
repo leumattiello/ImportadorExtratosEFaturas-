@@ -292,3 +292,50 @@ class TestesDiagnosticoBloqueios(TestCase):
                          resultado.bloqueados)
         self.assertTrue(all(isinstance(nome, str) and isinstance(qtd, int)
                             for nome, qtd in resultado.motivos_bloqueio))
+
+
+class TestesValoresNaoImportaveis(TestCase):
+    """A previa deve continuar sem arredondar ou gravar valores invalidos."""
+
+    def analisar(self, movimentos, confiavel=False):
+        return preparar_previa(movimentos, (), "BB", "CC1", confiavel,
+                               assumir_sim=True, exige_tty=False)
+
+    def test_zero_csv_e_bloqueado_sem_interromper_outras_linhas(self):
+        resultado = self.analisar([
+            movimento(id=None, valor="0.00"),
+            movimento(id=None, valor="-10.50", descricao="Compra A"),
+        ])
+        self.assertEqual(resultado.aprovados, (1,))
+        self.assertEqual(resultado.bloqueados, 1)
+        self.assertEqual(dict(resultado.motivos_bloqueio), {"valor_zero": 1})
+
+    def test_zero_ofx_com_fitid_tambem_e_bloqueado(self):
+        resultado = self.analisar([movimento(id="FIT-0", valor="0.00")],
+                                  confiavel=True)
+        self.assertEqual(resultado.aprovados, ())
+        self.assertEqual(dict(resultado.motivos_bloqueio), {"valor_zero": 1})
+
+    def test_precisao_maior_que_centavos_nao_e_arredondada(self):
+        resultado = self.analisar([
+            movimento(id=None, valor="-10.501"),
+            movimento(id=None, valor="-10.502"),
+            movimento(id=None, valor="-10.50"),
+        ])
+        self.assertEqual(resultado.aprovados, (2,))
+        self.assertEqual(resultado.bloqueados, 2)
+        self.assertEqual(dict(resultado.motivos_bloqueio),
+                         {"valor_precisao_excessiva": 2})
+
+    def test_35_movimentos_com_um_zero_mantem_resumo_consistente(self):
+        movimentos = [
+            movimento(id=f"REF-{i}", valor="0.00" if i == 17 else "-10.50",
+                      descricao=f"Transacao ficticia {i}")
+            for i in range(35)
+        ]
+        resultado = self.analisar(movimentos)
+        self.assertEqual(len(resultado.aprovados) + resultado.ignorados +
+                         resultado.bloqueados, len(movimentos))
+        self.assertEqual((len(resultado.aprovados), resultado.bloqueados),
+                         (34, 1))
+        self.assertEqual(dict(resultado.motivos_bloqueio), {"valor_zero": 1})

@@ -26,8 +26,12 @@ def _dados(mov):
     if not isinstance(mov.valor, Decimal) or not mov.valor.is_finite():
         raise ErroIdentidade("Valor invalido para identificador derivado.")
     valor = mov.valor
-    if valor == 0 or valor != valor.quantize(Decimal("0.01")):
-        raise ErroIdentidade("Valor invalido para identificador derivado.")
+    # A identificacao deve tolerar valores nao importaveis para que a previa
+    # possa bloquea-los individualmente sem abortar as demais movimentacoes.
+    # Nunca arredondar valores com mais de duas casas: isso geraria colisoes.
+    representacao = (format(valor, ".2f")
+                     if valor.as_tuple().exponent >= -2
+                     else format(valor.normalize(), "f"))
     if not isinstance(mov.descricao, str) or not mov.descricao.strip():
         raise ErroIdentidade("Descricao invalida para identificador derivado.")
     if not hasattr(mov.data, "isoformat"):
@@ -37,7 +41,7 @@ def _dados(mov):
         raise ErroIdentidade("Identificador externo invalido.")
     if isinstance(bruto, str) and (len(bruto) > 200 or any(ord(c) < 32 or ord(c) == 127 for c in bruto)):
         raise ErroIdentidade("Identificador externo invalido.")
-    return (mov.data.isoformat(), format(valor, ".2f"),
+    return (mov.data.isoformat(), representacao,
             " ".join(mov.descricao.split()).casefold(),
             bruto.strip() if isinstance(bruto, str) else "")
 

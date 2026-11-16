@@ -67,3 +67,14 @@ A previa exibe agora o detalhamento **somente por categoria e quantidade** quand
 - `conflito_id`, `id_repetido_no_lote`, `id_ja_reservado` e outros: identidade externa conflitante ou reserva repetida; nao sobrescrever
 
 Se a previa ainda mostrar bloqueios, **nao** execute `--importar` e nao utilize `--id-confiavel` apenas para forcar aprovacoes. Confirme primeiro se o codigo atualizado esta no HEAD local e depois interprete a lista de motivos. Os registros financeiros reais devem continuar privados.
+
+
+## Linhas com valor zero ou precisao excessiva
+
+Movimentacoes CSV/OFX com valor zero ou valor cuja precisao excede duas casas
+decimais nao podem ser gravadas na planilha pelo importador. A previa
+**nao deve abortar todo o arquivo** por isso: bloqueia apenas essas linhas,
+mostrando suas quantidades como \`valor_zero\` ou
+\`valor_precisao_excessiva\`, sem expor dados financeiros.
+Esses valores nao sao arredondados automaticamente. Antes de qualquer importacao,
+investigue os bloqueios e mantenha \`--planejar-importacao\` durante a homologacao.

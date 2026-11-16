@@ -64,6 +64,14 @@ def preparar_previa(movimentos,existentes,origem,conta,confiavel,*,
     ignorados=bloqueados=0
     causas=Counter()
     for indice,(mov,r,identidade) in enumerate(zip(movimentos,avaliados,identidades)):
+        # O parser pode aceitar uma linha de valor zero ou OFX com precisao
+        # superior a centavos. O gateway nunca grava esses valores, portanto
+        # bloqueamos apenas a linha, sem perder a previa do restante.
+        if mov.valor == 0 or mov.valor.as_tuple().exponent < -2:
+            contagens["REVISAR"]+=1
+            bloqueados+=1
+            causas["valor_zero" if mov.valor == 0 else "valor_precisao_excessiva"]+=1
+            continue
         ident=identidade.identificador
         reserva=ids_existentes | aceitos
         if identidade.derivado:
