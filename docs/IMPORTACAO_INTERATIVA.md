@@ -78,3 +78,19 @@ mostrando suas quantidades como \`valor_zero\` ou
 \`valor_precisao_excessiva\`, sem expor dados financeiros.
 Esses valores nao sao arredondados automaticamente. Antes de qualquer importacao,
 investigue os bloqueios e mantenha \`--planejar-importacao\` durante a homologacao.
+
+
+### Banco do Brasil — excluir saldos do CSV
+
+Configure no perfil BB privado, junto às opções existentes:
+
+~~~ini
+filtrar_coluna = Tipo Lançamento
+filtrar_valores = Entrada | Saída
+~~~
+
+As linhas filtradas não são movimentações: não aparecem na prévia, não
+recebem ID derivado e nunca são escritas na planilha. O filtro atua
+antes da deduplicação, preservando apenas transações válidas para análise.
+A contagem resultante deve ser conferida na execução com
+\`--planejar-importacao --assumir-sim\`.

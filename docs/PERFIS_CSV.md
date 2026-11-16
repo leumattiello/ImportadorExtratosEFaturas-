@@ -89,3 +89,35 @@ A saida padrao continua mostrando apenas contagens; nao exibe nomes, caminhos ou
 ## Limites
 
 A configuracao foi concebida para identificar **layouts de CSV**. Dois bancos com cabecalhos identicos nao podem ser distinguidos somente por eles: nesses casos, a origem devera ser determinada de maneira explicita em etapa posterior. Se nenhum perfil servir, a leitura falha sem importacao parcial. Esta etapa nao faz classificacao, conciliacao, deduplicacao de movimentacoes, historico persistente ou gravacao na planilha.
+
+
+## Filtro opcional por tipo de linha (extratos com saldos informativos)
+
+Um perfil pode selecionar apenas determinados valores de uma coluna.
+Por exemplo, para o layout CSV do Banco do Brasil com a coluna
+\`Tipo Lançamento\`, adicione **na seção existente do perfil BB**:
+
+~~~ini
+filtrar_coluna = Tipo Lançamento
+filtrar_valores = Entrada | Saída
+~~~
+
+Somente linhas cujo \`Tipo Lançamento\` seja \`Entrada\` ou \`Saída\`
+são consideradas movimentações. Linhas de saldo, cabeçalhos adicionais ou
+tipos diferentes são excluídas **antes** de interpretar data, descrição,
+valor e ID. A comparação desconsidera maiúsculas/minúsculas, acentos
+e espaços externos. Para sua segurança, confira se todos os tipos
+diferentes de Entrada/Saída são realmente informativos antes de adotar
+este filtro. O programa continua validando a estrutura CSV.
+
+- As opções \`filtrar_coluna\` e \`filtrar_valores\` são opcionais, mas devem
+  ser informadas juntas; use \`|\` como separador de valores.
+- O cabeçalho filtrado deve existir exatamente uma vez. Se não existir,
+  o programa falha em vez de importar o arquivo inteiro sem filtro.
+- Com o filtro, um arquivo formado exclusivamente por linhas informativas
+  retorna **zero movimentações**, sem erro nem gravação.
+- Perfis sem essas opções mantêm o comportamento antigo.
+- O filtro funciona no inventário/análise e também na simulação/importação
+  da PR #9, pois ambos utilizam o mesmo leitor CSV.
+
+O arquivo \`~/Financeiro/perfis.ini\` é privado: não o inclua no Git.

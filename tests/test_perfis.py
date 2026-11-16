@@ -270,4 +270,111 @@ delimitador = ;
         self.assertEqual(mov[0].descricao, "Compra\nem loja - OK")
 
 
+    def test_bb_filtro_tipo_lancamento_ignora_saldos(self):
+        self.configurar("""[perfil:bb_exemplo]
+requer_colunas = Data | Lançamento | Detalhes | N° documento | Valor | Tipo Lançamento
+descricao = Lançamento | Detalhes
+separador_descricao = " - "
+identificador = N° documento
+valor = Valor
+filtrar_coluna = Tipo Lançamento
+filtrar_valores = Entrada | Saída
+delimitador = ;
+""")
+        caminho = self.csv("2026", "bb.csv",
+            "Data;Lançamento;Detalhes;N° documento;Valor;Tipo Lançamento\n"
+            "01/11/2026;Saldo anterior;; ;0,00;Saldo\n"
+            "02/11/2026;PIX fictício;Compra;100;-30,50;Saída\n"
+            "03/11/2026;Crédito fictício;Depósito;101;99,90;Entrada\n"
+            "04/11/2026;Saldo atual;; ;0,00;\n"
+            "05/11/2026;Movimento desconhecido;Aviso;102;5,00;Outros\n")
+        perfil=selecionar_perfil(caminho,ler_perfis(self.ini))
+        mov=ler_csv(caminho,colunas=perfil.colunas,delimitador=perfil.delimitador)
+        self.assertEqual(len(mov),2)
+        self.assertEqual([str(m.valor) for m in mov],["-30.50","99.90"])
+        self.assertEqual([m.identificador for m in mov],["100","101"])
+        self.assertEqual(mov[0].descricao,"PIX fictício - Compra")
+        status,saida,erro=self.executar()
+        self.assertEqual(status,0,erro)
+        self.assertIn("Movimentacoes CSV identificadas: 2",saida)
+
+    def test_filtrar_antes_de_validar_campos_de_saldo(self):
+        self.configurar("""[perfil:bb]
+requer_colunas = Data | Lançamento | Valor | Tipo Lançamento
+descricao = Lançamento
+valor = Valor
+filtrar_coluna = Tipo Lançamento
+filtrar_valores = Entrada | Saída
+delimitador = ;
+""")
+        caminho=self.csv("2026","bb.csv",
+            "Data;Lançamento;Valor;Tipo Lançamento\n"
+            "DATA INVALIDA;;VALOR INVALIDO;Saldo\n"
+            "02/11/2026;Compra fictícia;-4,00; SaÍda \n")
+        p=selecionar_perfil(caminho,ler_perfis(self.ini))
+        mov=ler_csv(caminho,colunas=p.colunas,delimitador=p.delimitador)
+        self.assertEqual(len(mov),1)
+        self.assertEqual(str(mov[0].valor),"-4.00")
+
+    def test_filtro_valor_desconhecido_nao_importa(self):
+        self.configurar("""[perfil:bb]
+requer_colunas = Data | Lançamento | Valor | Tipo Lançamento
+descricao = Lançamento
+valor = Valor
+filtrar_coluna = Tipo Lançamento
+filtrar_valores = Entrada | Saída
+delimitador = ;
+""")
+        caminho=self.csv("2026","bb.csv",
+            "Data;Lançamento;Valor;Tipo Lançamento\n"
+            "02/11/2026;Outros fictício;25,00;Ajuste\n")
+        p=selecionar_perfil(caminho,ler_perfis(self.ini))
+        self.assertEqual(ler_csv(caminho,colunas=p.colunas,delimitador=p.delimitador),())
+        status,saida,erro=self.executar()
+        self.assertEqual(status,0,erro)
+        self.assertIn("Movimentacoes CSV identificadas: 0",saida)
+
+    def test_filtro_sem_coluna_requerida_falha_fechado(self):
+        self.configurar("""[perfil:bb]
+requer_colunas = Data | Lançamento | Valor
+descricao = Lançamento
+valor = Valor
+filtrar_coluna = Tipo Lançamento
+filtrar_valores = Entrada | Saída
+delimitador = ;
+""")
+        caminho=self.csv("2026","bb.csv",
+            "Data;Lançamento;Valor\n02/11/2026;Compra fictícia;-4,00\n")
+        p=selecionar_perfil(caminho,ler_perfis(self.ini))
+        with self.assertRaisesRegex(Exception,"Coluna de filtro"):
+            ler_csv(caminho,colunas=p.colunas,delimitador=p.delimitador)
+
+    def test_filtro_incompleto_e_duplicado_rejeitados(self):
+        exemplos=[
+            "filtrar_coluna = Tipo Lançamento\n",
+            "filtrar_valores = Entrada | Saída\n",
+            "filtrar_coluna = Tipo Lançamento\nfiltrar_valores = Entrada | entrada\n",
+        ]
+        for extra in exemplos:
+            with self.subTest(extra=extra):
+                self.configurar("[perfil:bb]\nrequer_colunas = Data | Lançamento | Valor\n"
+                               "descricao = Lançamento\nvalor = Valor\n"+extra)
+                with self.assertRaises(ErroPerfis):
+                    ler_perfis(self.ini)
+
+    def test_perfil_sem_filtro_nao_muda_comportamento(self):
+        self.configurar("""[perfil:normal]
+requer_colunas = Data | Lançamento | Valor
+descricao = Lançamento
+valor = Valor
+delimitador = ;
+""")
+        caminho=self.csv("2026","normal.csv",
+            "Data;Lançamento;Valor\n"
+            "02/11/2026;Saldo descritivo;0,00\n"
+            "03/11/2026;Compra;-1,00\n")
+        p=selecionar_perfil(caminho,ler_perfis(self.ini))
+        self.assertEqual(len(ler_csv(caminho,colunas=p.colunas,delimitador=p.delimitador)),2)
+
+
 if __name__ == "__main__": unittest.main()

@@ -38,6 +38,8 @@ class ColunasCSV:
     debito: str | None = None
     identificador: str | None = None
     separador_descricao: str = " - "
+    filtrar_coluna: str | None = None
+    filtrar_valores: tuple[str, ...] = ()
 
 
 _ALIASES = {
@@ -244,6 +246,19 @@ def ler_csv(
         raise ErroCSV("Numero de linhas ignoradas invalido.")
     config = colunas or ColunasCSV()
     separador_descricao = config.separador_descricao
+    if bool(config.filtrar_coluna) != bool(config.filtrar_valores):
+        raise ErroCSV("Filtro CSV incompleto; configure coluna e valores permitidos.")
+    if (config.filtrar_coluna is not None and
+            (not isinstance(config.filtrar_coluna, str) or
+             not _normalizar(config.filtrar_coluna))):
+        raise ErroCSV("Coluna de filtro CSV invalida.")
+    if (not isinstance(config.filtrar_valores, tuple)
+            or len(config.filtrar_valores) > 20
+            or any(not isinstance(v, str) or not _normalizar(v)
+                   for v in config.filtrar_valores)
+            or len({_normalizar(v) for v in config.filtrar_valores})
+               != len(config.filtrar_valores)):
+        raise ErroCSV("Valores de filtro CSV invalidos.")
     if (not isinstance(separador_descricao, str) or len(separador_descricao) > 40
             or any(ord(caractere) < 32 or ord(caractere) == 127
                    for caractere in separador_descricao)):
@@ -255,6 +270,14 @@ def ler_csv(
         linhas = csv.reader(StringIO(dados, newline=""), delimiter=separador, strict=True)
         cabecalho = next(linhas)
         indices = _escolher_colunas(cabecalho, config)
+        filtro_indice = None
+        if config.filtrar_coluna:
+            candidatos = [i for i, nome in enumerate(cabecalho)
+                          if _normalizar(nome) == _normalizar(config.filtrar_coluna)]
+            if len(candidatos) != 1:
+                raise ErroCSV("Coluna de filtro CSV ausente ou ambigua.")
+            filtro_indice = candidatos[0]
+        valores_aceitos = {_normalizar(v) for v in config.filtrar_valores}
         movimentos = []
         for linha in linhas:
             numero = pular_linhas + linhas.line_num
@@ -262,6 +285,11 @@ def ler_csv(
                 continue
             if len(linha) != len(cabecalho):
                 raise ErroCSV(f"Quantidade de campos invalida na linha {numero}.")
+            # Ignora registros informativos antes de interpretar data/valor:
+            # tais linhas podem nao ter campos de movimentacao preenchidos.
+            if (filtro_indice is not None and
+                    _normalizar(linha[filtro_indice]) not in valores_aceitos):
+                continue
             try:
                 partes = [
                     linha[indice].strip()
@@ -283,6 +311,6 @@ def ler_csv(
         raise ErroCSV("CSV vazio ou sem cabecalho.") from exc
     except csv.Error as exc:
         raise ErroCSV("Estrutura CSV malformada.") from exc
-    if not movimentos:
+    if not movimentos and filtro_indice is None:
         raise ErroCSV("CSV sem movimentacoes para leitura.")
     return tuple(movimentos)

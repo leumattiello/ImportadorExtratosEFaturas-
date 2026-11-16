@@ -12,7 +12,8 @@ from .leitor_csv import ColunasCSV, ErroCSV, _ler_texto, _separador, _normalizar
 _LIMITE_CONFIG = 128 * 1024
 _LIMITE_PERFIS = 50
 _CAMPOS = ("data", "descricao", "valor", "credito", "debito", "identificador")
-_OPCOES = {"requer_colunas", "delimitador", "pular_linhas", "separador_descricao", *_CAMPOS}
+_OPCOES = {"requer_colunas", "delimitador", "pular_linhas", "separador_descricao",
+           "filtrar_coluna", "filtrar_valores", *_CAMPOS}
 
 
 class ErroPerfis(Exception):
@@ -89,9 +90,22 @@ def ler_perfis(arquivo: Path) -> tuple[PerfilCSV, ...]:
             raise ErroPerfis("Separador de descricao invalido.")
         if len(separador) > 40 or any(ord(c) < 32 or ord(c) == 127 for c in separador):
             raise ErroPerfis("Separador de descricao invalido.")
+        coluna_filtro = opcoes.get("filtrar_coluna") or None
+        valores_filtro_texto = opcoes.get("filtrar_valores") or None
+        if bool(coluna_filtro) != bool(valores_filtro_texto):
+            raise ErroPerfis("Filtro CSV exige filtrar_coluna e filtrar_valores.")
+        valores_filtro = tuple(v.strip() for v in valores_filtro_texto.split("|")) if valores_filtro_texto else ()
+        if valores_filtro and (not 1 <= len(valores_filtro) <= 20
+                              or any(not _normalizar(v) for v in valores_filtro)
+                              or len({_normalizar(v) for v in valores_filtro}) != len(valores_filtro)):
+            raise ErroPerfis("Valores permitidos do filtro CSV invalidos.")
+        if coluna_filtro and not _normalizar(coluna_filtro):
+            raise ErroPerfis("Coluna de filtro CSV invalida.")
         saida.append(PerfilCSV(
             identificacao=frozenset(exigidas),
-            colunas=ColunasCSV(**mapeamento, separador_descricao=separador),
+            colunas=ColunasCSV(**mapeamento, separador_descricao=separador,
+                               filtrar_coluna=coluna_filtro,
+                               filtrar_valores=valores_filtro),
             delimitador=delim, pular_linhas=ignoradas,
         ))
     return tuple(saida)
