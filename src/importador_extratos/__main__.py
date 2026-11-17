@@ -15,6 +15,27 @@ from .perfis_csv import ErroPerfis, ler_perfis, selecionar_perfil
 def main(argv: list[str] | tuple[str, ...] = ()) -> int:
     parser = argparse.ArgumentParser(description="Inventario e leitura CSV/OFX (somente leitura).")
     parser.add_argument("--pasta", type=Path, help="Raiz privada com subpastas AAAA.")
+    modo = parser.add_mutually_exclusive_group()
+    modo.add_argument("--planejar-importacao", action="store_true",
+                      help="Comparar com Google Sheets e revisar sem gravar lancamentos.")
+    modo.add_argument("--importar", action="store_true",
+                      help="Revisar e gravar lancamentos aprovados no Google Sheets.")
+    parser.add_argument("--arquivo", type=Path, help="Arquivo OFX/CSV individual para revisao.")
+    parser.add_argument("--planilha-id", help="ID privado da planilha Google.")
+    parser.add_argument("--ano-competencia", type=int, help="Ano da pasta fonte e da planilha.")
+    parser.add_argument("--mes-competencia", type=int, help="Mes de destino (1 a 12).")
+    parser.add_argument("--origem", help="Codigo estavel da instituicao, ex.: BB.")
+    parser.add_argument("--conta", help="Codigo da conta/cartao, ex.: CC1.")
+    parser.add_argument("--conta-planilha", help="Nome exato da conta na aba Dados.")
+    parser.add_argument("--categoria", help="Contrapartida padrao SOMENTE para lotes homogeneos.")
+    parser.add_argument("--id-confiavel", action="store_true",
+                        help="Assumir unicidade do ID externo CSV (somente se comprovada).")
+    parser.add_argument("--credenciais-google", type=Path,
+                        help="OAuth de aplicativo desktop, arquivo privado fora do Git.")
+    parser.add_argument("--token-google", type=Path,
+                        help="Token OAuth privado fora do repositorio.")
+    parser.add_argument("-y", "--assumir-sim", action="store_true",
+                        help="Responder S nas revisoes admissiveis; nao ignora conflitos.")
     parser.add_argument("--analisar-ofx", action="store_true", help="Interpretar transacoes OFX.")
     parser.add_argument("--analisar-csv", action="store_true", help="Interpretar transacoes CSV.")
     parser.add_argument("--registrar-historico", action="store_true",
@@ -33,6 +54,29 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
         parser.add_argument(f"--csv-coluna-{opcao}",
                             help=f"Nome literal do cabecalho CSV para {opcao}.")
     args = parser.parse_args(argv)
+    modo_importacao = args.planejar_importacao or args.importar
+    if args.assumir_sim and not modo_importacao:
+        parser.error("--assumir-sim requer --planejar-importacao ou --importar")
+    if modo_importacao:
+        obrigatorios = ("pasta", "arquivo", "planilha_id", "ano_competencia",
+                       "mes_competencia", "origem", "conta")
+        for campo in obrigatorios:
+            if getattr(args, campo) is None:
+                parser.error(f"--{campo.replace('_', '-')} e obrigatorio nesta operacao")
+        if args.importar and args.conta_planilha is None:
+            parser.error("--importar requer --conta-planilha")
+        if args.registrar_historico or args.analisar_ofx or args.analisar_csv:
+            parser.error("Nao combine revisao/importacao com analise antiga ou historico.")
+        if args.sem_perfis and args.perfis:
+            parser.error("--sem-perfis nao pode ser combinado com --perfis")
+        if args.csv_pular_linhas < 0:
+            parser.error("--csv-pular-linhas nao pode ser negativo")
+        from .fluxo_importacao import ErroFluxo, executar
+        try:
+            return executar(args)
+        except ErroFluxo as exc:
+            print(f"Importacao interrompida: {exc}", file=sys.stderr)
+            return 1
     if args.registrar_historico and not (args.analisar_ofx or args.analisar_csv):
         parser.error("--registrar-historico requer --analisar-ofx ou --analisar-csv")
     if args.mostrar_detalhes and not (args.analisar_ofx or args.analisar_csv):

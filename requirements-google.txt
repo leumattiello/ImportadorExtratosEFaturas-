@@ -1,0 +1,3 @@
+# O modo somente leitura local nao depende destes pacotes.
+google-api-python-client>=2.0,<3
+google-auth-oauthlib>=1.0,<2
