@@ -5,11 +5,12 @@ from io import StringIO
 import sys
 from pathlib import Path
 from unittest import TestCase
+from unittest.mock import patch
 from contextlib import redirect_stdout
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/"src"))
 from importador_extratos.identidade import Lancamento
-from importador_extratos.fluxo_importacao import confirmar, preparar_previa
+from importador_extratos.fluxo_importacao import confirmar, preparar_previa, _categoria, _valor_para_revisao
 from importador_extratos.sheets_gateway import (
     ErroPlanilha, MESES, LinhaNova, _data, _valor, _linha,
     ler_instantaneo, gravar_lote,
@@ -339,3 +340,30 @@ class TestesValoresNaoImportaveis(TestCase):
         self.assertEqual((len(resultado.aprovados), resultado.bloqueados),
                          (34, 1))
         self.assertEqual(dict(resultado.motivos_bloqueio), {"valor_zero": 1})
+
+
+class TestesExibicaoValorCategoria(TestCase):
+    def test_valor_formatado_com_sinal_e_centavos(self):
+        self.assertEqual(_valor_para_revisao(Decimal("-1234.50")), "R$ -1.234,50")
+        self.assertEqual(_valor_para_revisao(Decimal("2500")), "R$ +2.500,00")
+
+    def test_pergunta_categoria_contem_valor_e_descricao(self):
+        perguntas=[]
+        def responder(pergunta):
+            perguntas.append(pergunta)
+            return "Alimentação"
+        mov=movimento(id="DOC-001",valor="-1234.50",descricao="Mercado ficticio")
+        with patch("importador_extratos.fluxo_importacao.sys.stdin.isatty",return_value=True):
+            with patch("builtins.input",side_effect=responder):
+                selecionada=_categoria(mov,{"Alimentação","Habitação"},None,False)
+        self.assertEqual(selecionada,"Alimentação")
+        self.assertEqual(len(perguntas),1)
+        self.assertIn("05/11/2026",perguntas[0])
+        self.assertIn("Mercado ficticio",perguntas[0])
+        self.assertIn("R$ -1.234,50",perguntas[0])
+        self.assertIn("categoria?",perguntas[0])
+
+    def test_categoria_padrao_preserva_comportamento(self):
+        mov=movimento()
+        with patch("builtins.input",side_effect=AssertionError("Nao perguntar")):
+            self.assertEqual(_categoria(mov,{"Alimentação"},"Alimentação",False),"Alimentação")

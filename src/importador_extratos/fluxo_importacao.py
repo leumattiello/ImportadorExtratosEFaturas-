@@ -202,6 +202,12 @@ def _ler(arquivo,args,pasta):
     return ler_csv(arquivo,colunas=colunas,delimitador=args.csv_delimitador,
                    pular_linhas=args.csv_pular_linhas)
 
+def _valor_para_revisao(valor):
+    """Exibe o sinal do movimento e os centavos em notacao brasileira."""
+    numero=f"{abs(valor):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    sinal="-" if valor<0 else "+"
+    return f"R$ {sinal}{numero}"
+
 def _categoria(m,contas,padrao,assumir_sim):
     if padrao:
         if padrao not in contas:
@@ -213,7 +219,8 @@ def _categoria(m,contas,padrao,assumir_sim):
         raise ErroFluxo("Classificacao requer terminal ou --categoria.")
     for tentativa in range(5):
         try:
-            resposta=input(f"{m.data:%d/%m/%Y} | {m.descricao[:28]}: categoria? ").strip()
+            resposta=input(f"{m.data:%d/%m/%Y} | {m.descricao[:28]} | "
+                          f"{_valor_para_revisao(m.valor)}: categoria? ").strip()
         except (EOFError,KeyboardInterrupt) as exc:
             raise ErroFluxo("Classificacao interrompida; nenhuma gravacao.") from exc
         if resposta in contas:return resposta

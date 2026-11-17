@@ -34,6 +34,7 @@ CSV utiliza perfis privados por cabecalho; numeros de documento CSV sao tratados
 Substitua --planejar-importacao por --importar. Acrescente --conta-planilha com o nome exato da conta em Dados!A.
 O parametro --categoria atribui a mesma categoria a todo o lote; use apenas em lotes homogeneos.
 Sem --categoria, o terminal pergunta a categoria de cada transacao aprovada.
+A pergunta mostra a data, uma descricao resumida e o valor com sinal em reais (por exemplo, `R$ -1.234,50`), para facilitar a escolha da contrapartida. Valores negativos representam saidas e positivos representam entradas.
 Com -y, --categoria e obrigatoria para evitar classificacoes silenciosas.
 Uma despesa registra C=conta origem, D=contrapartida, E=valor positivo; entradas invertem C/D. A=data real, F=ID automatico.
 O programa faz confirmacao final [s/N], Enter=N; -y permite o aceite final apenas se nao houver conflito bloqueante.
