@@ -32,10 +32,12 @@ CSV utiliza perfis privados por cabecalho; numeros de documento CSV sao tratados
 ## Gravar apenas depois de homologar a simulacao
 
 Substitua --planejar-importacao por --importar. Acrescente --conta-planilha com o nome exato da conta em Dados!A.
-O parametro --categoria atribui a mesma categoria a todo o lote; use apenas em lotes homogeneos.
-Sem --categoria, o terminal pergunta a categoria de cada transacao aprovada.
-A pergunta mostra a data, uma descricao resumida e o valor com sinal em reais (por exemplo, `R$ -1.234,50`), para facilitar a escolha da contrapartida. Valores negativos representam saidas e positivos representam entradas.
-Com -y, --categoria e obrigatoria para evitar classificacoes silenciosas.
+A partir da PR #11, a natureza contabil e explicita: `--natureza despesa` ou `--natureza outra`, ou escolha interativa por lancamento. O sinal nao determina a natureza: pode haver receitas, estornos e transferencias patrimoniais.
+Para despesas, informe `--subcategoria` somente em lote homogeneo ou escolha uma subcategoria da lista durante a revisao. A categoria principal e inferida do cadastro lateral M:T (12 abas), e a descricao ganha prefixo sem duplicacao.
+Para `--natureza outra`, a contrapartida continua sendo a `--categoria` da aba Dados, sem prefixo de despesa.
+As perguntas mostram data, descricao resumida e valor com sinal em reais (por exemplo, `R$ -1.234,50`).
+Com `-y`, informe obrigatoriamente `--natureza despesa --subcategoria NOME` ou `--natureza outra --categoria NOME`. Nunca aplique `-y` a lotes heterogeneos.
+Veja `docs/RF-065-ETAPA-2.md` para as regras e limitacoes. Os fluxos de receitas, transferencias e cartoes ainda precisam de homologacao contabil com dados sinteticos antes de uso real.
 Uma despesa registra C=conta origem, D=contrapartida, E=valor positivo; entradas invertem C/D. A=data real, F=ID automatico.
 O programa faz confirmacao final [s/N], Enter=N; -y permite o aceite final apenas se nao houver conflito bloqueante.
 Antes de gravar, todas as abas sao relidas. Qualquer mudanca detectada cancela o lote.
