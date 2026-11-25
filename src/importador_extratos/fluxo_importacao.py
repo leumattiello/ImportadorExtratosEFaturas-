@@ -11,6 +11,8 @@ from .leitor_csv import ColunasCSV, ErroCSV, ler_csv
 from .ofx import ErroOFX, ler_ofx
 from .perfis_csv import ErroPerfis, ler_perfis, selecionar_perfil
 from .sheets_gateway import ErroPlanilha, LinhaNova, autenticar, ler_instantaneo, gravar_lote
+from .catalogo_gateway import ErroLeituraCatalogo, ler_catalogo_subcategorias
+from .subcategorias import ErroSubcategoria, classificar_descricao
 
 class ErroFluxo(Exception):
     """Falha controlada; dados bancarios nao aparecem em mensagens de erro."""
@@ -227,6 +229,90 @@ def _categoria(m,contas,padrao,assumir_sim):
         print("Digite exatamente uma categoria/conta da aba Dados.")
     raise ErroFluxo("Categoria invalida; nenhuma gravacao.")
 
+def _natureza(m, padrao=None, *, assumir_sim=False, entrada=input):
+    """O sinal do extrato nao identifica a natureza contabil da operacao."""
+    if padrao is not None:
+        if padrao not in ("despesa", "outra"):
+            raise ErroFluxo("Natureza contabil invalida.")
+        return padrao
+    if assumir_sim or not sys.stdin.isatty():
+        raise ErroFluxo("Informe --natureza para classificacao sem terminal.")
+    for _ in range(5):
+        try:
+            resposta = entrada(
+                f"{m.data:%d/%m/%Y} | {m.descricao[:28]} | "
+                f"{_valor_para_revisao(m.valor)}: natureza [d=despesa, o=outra]? "
+            ).strip().casefold()
+        except (EOFError, KeyboardInterrupt) as exc:
+            raise ErroFluxo("Classificacao interrompida; nenhuma gravacao.") from exc
+        if resposta in ("d", "despesa"):
+            return "despesa"
+        if resposta in ("o", "outra"):
+            return "outra"
+        print("Informe d ou o. Receitas e transferencias patrimoniais sao 'outra'.")
+    raise ErroFluxo("Natureza invalida; nenhuma gravacao.")
+
+
+def _subcategoria(m, catalogo, escolha=None, *, assumir_sim=False, entrada=input):
+    """Escolhe subcategoria ou reconhece prefixo ja presente na descricao."""
+    try:
+        # Prefixo valido e suficiente, mesmo com -y; nunca duplicar.
+        reconhecida = classificar_descricao(catalogo, m.descricao)
+    except ErroSubcategoria:
+        reconhecida = None
+    if reconhecida is not None:
+        if escolha is None:
+            return reconhecida
+        try:
+            return classificar_descricao(catalogo, m.descricao, escolha)
+        except ErroSubcategoria as exc:
+            raise ErroFluxo("Prefixo e subcategoria informada sao incompatíveis.") from exc
+    if escolha is not None:
+        try:
+            return classificar_descricao(catalogo, m.descricao, escolha)
+        except ErroSubcategoria as exc:
+            raise ErroFluxo("Subcategoria selecionada invalida ou ambigua.") from exc
+    if assumir_sim or not sys.stdin.isatty():
+        raise ErroFluxo("Subcategoria nao identificada: requer revisao interativa.")
+    opcoes = {item.nome.casefold(): item.nome for item in catalogo}
+    print("Subcategorias disponiveis:")
+    for item in catalogo:
+        print(f"  {item.nome} ({item.categoria})")
+    for _ in range(5):
+        try:
+            resposta = entrada(
+                f"{m.data:%d/%m/%Y} | {m.descricao[:28]} | "
+                f"{_valor_para_revisao(m.valor)}: subcategoria? "
+            ).strip()
+        except (EOFError, KeyboardInterrupt) as exc:
+            raise ErroFluxo("Classificacao interrompida; nenhuma gravacao.") from exc
+        if resposta.casefold() in opcoes:
+            try:
+                return classificar_descricao(catalogo, m.descricao,
+                                           opcoes[resposta.casefold()])
+            except ErroSubcategoria as exc:
+                raise ErroFluxo("Descricao e subcategoria incompativeis.") from exc
+        print("Escolha exatamente uma subcategoria existente.")
+    raise ErroFluxo("Subcategoria invalida; nenhuma gravacao.")
+
+
+def _classificar(m, contas, catalogo, *, natureza=None, subcategoria=None,
+                 categoria=None, assumir_sim=False):
+    """Separa natureza contabil e despesa; nunca infere natureza do sinal."""
+    tipo = _natureza(m, natureza, assumir_sim=assumir_sim)
+    if tipo == "despesa":
+        if categoria:
+            raise ErroFluxo("Despesa requer subcategoria, nao categoria principal.")
+        item = _subcategoria(m, catalogo, subcategoria, assumir_sim=assumir_sim)
+        if item.categoria not in contas:
+            raise ErroFluxo("Categoria inferida nao localizada na aba Dados.")
+        return item.categoria, item.descricao
+    if subcategoria:
+        raise ErroFluxo("Subcategoria nao se aplica a esta natureza contabil.")
+    contrapartida = _categoria(m, contas, categoria, assumir_sim)
+    return contrapartida, m.descricao
+
+
 def executar(args):
     """Um arquivo e um mes por execucao; nunca acessa dados bancarios publicamente."""
     pasta=Path(args.pasta).expanduser()
@@ -262,13 +348,17 @@ def executar(args):
             raise ErroFluxo("Conflitos de ID detectados; importacao bloqueada.")
         if args.conta_planilha not in estado.contas:
             raise ErroFluxo("Conta nao encontrada na aba Dados.")
-        if args.assumir_sim and not args.categoria:
-            raise ErroFluxo("--assumir-sim requer --categoria para escrita.")
+        catalogo=ler_catalogo_subcategorias(api,args.planilha_id)
+        if args.assumir_sim and not args.natureza:
+            raise ErroFluxo("--assumir-sim exige --natureza.")
         linhas=[]
         for i,ident in zip(previa.aprovados,previa.ids_aprovados):
             m=movimentos[i]
-            categoria=_categoria(m,estado.contas,args.categoria,args.assumir_sim)
-            linhas.append(LinhaNova(m.data,m.descricao,m.valor,ident,
+            categoria,descricao=_classificar(
+                m,estado.contas,catalogo,natureza=args.natureza,
+                subcategoria=args.subcategoria,categoria=args.categoria,
+                assumir_sim=args.assumir_sim)
+            linhas.append(LinhaNova(m.data,descricao,m.valor,ident,
                                    args.conta_planilha,categoria))
         if not linhas:
             print("Nenhuma movimentacao elegivel para gravacao.")
@@ -277,8 +367,11 @@ def executar(args):
                          assumir_sim=args.assumir_sim,padrao_sim=False):
             print("Gravacao cancelada.")
             return 0
+        # Uma alteracao de subcategorias durante a revisao cancela a escrita.
+        if ler_catalogo_subcategorias(api,args.planilha_id) != catalogo:
+            raise ErroFluxo("Cadastro de subcategorias mudou; execute novamente.")
         n=gravar_lote(api,args.planilha_id,estado,args.mes_competencia,tuple(linhas))
         print(f"Importacao confirmada no Google Sheets: {n} lancamentos.")
         return 0
-    except (ErroCSV,ErroOFX,ErroPerfis,ErroPlanilha,ErroIdentidade) as exc:
+    except (ErroCSV,ErroOFX,ErroPerfis,ErroPlanilha,ErroIdentidade,ErroLeituraCatalogo) as exc:
         raise ErroFluxo(str(exc)) from exc
