@@ -27,7 +27,10 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
     parser.add_argument("--origem", help="Codigo estavel da instituicao, ex.: BB.")
     parser.add_argument("--conta", help="Codigo da conta/cartao, ex.: CC1.")
     parser.add_argument("--conta-planilha", help="Nome exato da conta na aba Dados.")
-    parser.add_argument("--categoria", help="Contrapartida padrao SOMENTE para lotes homogeneos.")
+    parser.add_argument("--categoria", help="Contrapartida explicita para operacoes nao classificadas como despesa.")
+    parser.add_argument("--subcategoria", help="Subcategoria existente para lote homogeneo de despesas.")
+    parser.add_argument("--natureza", choices=("despesa", "outra"),
+                        help="Natureza contabil explicita do lote (obrigatoria com -y).")
     parser.add_argument("--id-confiavel", action="store_true",
                         help="Assumir unicidade do ID externo CSV (somente se comprovada).")
     parser.add_argument("--credenciais-google", type=Path,
@@ -63,6 +66,14 @@ def main(argv: list[str] | tuple[str, ...] = ()) -> int:
         for campo in obrigatorios:
             if getattr(args, campo) is None:
                 parser.error(f"--{campo.replace('_', '-')} e obrigatorio nesta operacao")
+        if args.categoria and args.subcategoria:
+            parser.error("--categoria e --subcategoria nao podem ser combinadas")
+        if args.subcategoria and args.natureza != "despesa":
+            parser.error("--subcategoria requer --natureza despesa")
+        if args.assumir_sim and (args.natureza is None or
+             (args.natureza == "despesa" and not args.subcategoria) or
+             (args.natureza == "outra" and not args.categoria)):
+            parser.error("-y requer --natureza e --subcategoria (despesa) ou --categoria (outra)")
         if args.importar and args.conta_planilha is None:
             parser.error("--importar requer --conta-planilha")
         if args.registrar_historico or args.analisar_ofx or args.analisar_csv:
