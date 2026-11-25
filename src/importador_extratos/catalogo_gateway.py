@@ -32,7 +32,7 @@ def ler_catalogo_subcategorias(servico, planilha_id):
         for mes, faixa, bloco in zip(MESES, ranges, blocos):
             # Confirmar que cada bloco corresponde a faixa esperada.
             retornada = bloco.get("range", "")
-            if retornada.replace("$", "") != faixa:
+            if retornada.replace("$", "").replace("\'", "") != faixa.replace("\'", ""):
                 raise ErroLeituraCatalogo("Faixas de cadastro divergentes na API.")
             linhas = bloco.get("values", [])
             if len(linhas) > 35 or any(not isinstance(l, list) or len(l) > 8
